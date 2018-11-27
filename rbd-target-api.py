@@ -1538,6 +1538,16 @@ def hostgroup(group_name):
     local_gw = this_host()
     gw_list = [key for key in config.config['gateways']
                if isinstance(config.config['gateways'][key], dict)]
+
+    # Any host-groups operation must be started by the `local_gw`
+    # so `local_gw` must exist in the gateways configuration
+    if local_gw not in gw_list:
+        msg = "local machine ({}) cannot be used to perform host-groups " \
+              "operations because it is not defined within gateways " \
+              "configuration".format(local_gw)
+        logger.warning("host-group request failed: {}".format(msg))
+        return jsonify(message=msg), 400
+
     gw_list.remove(local_gw)
 
     action = request.form.get('action', 'add')
