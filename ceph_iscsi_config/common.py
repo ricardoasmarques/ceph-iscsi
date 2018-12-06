@@ -51,9 +51,8 @@ class Config(object):
 
     seed_config = {"disks": {},
                    "gateways": {},
-                   "clients": {},
-                   "groups": {},
-                   "version": 3,
+                   "targets": {},
+                   "version": 4,
                    "epoch": 0,
                    "created": '',
                    "updated": ''
@@ -150,6 +149,7 @@ class Config(object):
 
         self.logger.debug("(_get_rbd_config) config object contains '{}'".format(cfg_data))
 
+        # TODO rimarques upgrade from v3 to v4
         cfg_dict = json.loads(cfg_data)
 
         return cfg_dict

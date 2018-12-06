@@ -875,3 +875,95 @@ class Disk(UINode):
         name: snapshot name
         """
         self.snapshot(action, name)
+
+
+class TargetDisks(UIGroup):
+    help_intro = '''
+                 The target disks section shows the disks that are mapped
+                 to this target.
+
+                 Disks may be added or deleted using the add/delete command,
+                 but the same disk cannot be mapped to multiple targets.
+                 '''
+
+    def __init__(self, parent):
+        UIGroup.__init__(self, 'disks', parent)
+        self.http_mode = self.parent.http_mode
+        self.target_iqn = self.parent.name
+
+    def load(self, disks):
+        for disk in disks:
+            TargetDisk(self, disk)
+
+    def ui_command_add(self, disk=None):
+        self.add_disk(disk)
+
+    def add_disk(self, disk):
+        rc = 0
+        api_vars = {"disk": disk}
+        targetdisk_api = ('{}://localhost:{}/api/'
+                          'targetlun/{}'.format(self.http_mode,
+                                                settings.config.api_port,
+                                                self.target_iqn))
+        api = APIRequest(targetdisk_api, data=api_vars)
+        api.put()
+        if api.response.status_code == 200:
+            config = get_config()
+            owner = config['disks'][disk]['owner']
+            ui_root = self.get_ui_root()
+            disk = ui_root.disks.disk_lookup[disk]
+            disk.owner = owner
+            self.logger.debug("- Disk '{}' owner updated to {}"
+                              .format(disk, owner))
+            TargetDisk(self, disk.name)
+            self.logger.debug("- TargetDisk '{}' added".format(disk))
+            self.logger.info('ok')
+        else:
+            self.logger.error("Failed - {}".format(response_message(api.response,
+                                                                    self.logger)))
+            rc = 1
+        return rc
+
+    def ui_command_delete(self, disk=None):
+        self.delete_disk(disk)
+
+    def delete_disk(self, disk):
+        rc = 0
+        api_vars = {"disk": disk}
+        targetdisk_api = ('{}://localhost:{}/api/'
+                          'targetlun/{}'.format(self.http_mode,
+                                                settings.config.api_port,
+                                                self.target_iqn))
+        api = APIRequest(targetdisk_api, data=api_vars)
+        api.delete()
+        if api.response.status_code == 200:
+            target_disk = [target_disk for target_disk in self.children
+                           if target_disk.name == disk][0]
+            self.remove_child(target_disk)
+            self.logger.debug("- TargetDisk '{}' deleted".format(disk))
+            self.logger.info('ok')
+        else:
+            self.logger.error("Failed - {}".format(response_message(api.response,
+                                                                    self.logger)))
+            rc = 1
+        return rc
+
+    def summary(self):
+        return "Disks: {}".format(len(self.children)), None
+
+
+class TargetDisk(UINode):
+    help_intro = '''
+                 Represents a disk that is mapped to the target.
+                 '''
+
+    display_attributes = ['name', 'owner']
+
+    def __init__(self, parent, name):
+        UINode.__init__(self, name, parent)
+        ui_root = self.get_ui_root()
+        disk = ui_root.disks.disk_lookup[name]
+        self.owner = disk.owner
+
+    def summary(self):
+        return "Owner: {}".format(self.owner), True
