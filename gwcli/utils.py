@@ -310,7 +310,7 @@ def valid_client(**kwargs):
         if chap:
             if not valid_credentials(chap):
                 return ("Invalid format for CHAP credentials. Refer to 'help' "
-                        "or documentation for the correct format")
+                        "or documentation for the correct format - {}".format(chap))
 
         return 'ok'
 

@@ -259,6 +259,8 @@ def target(target_iqn=None):
         return jsonify(message="Unexpected or invalid controls - "
                                "{}".format(err)), 500
 
+    logger.error("### tpg_controls, client_controls = {}. {}".format(tpg_controls, client_controls))
+
     gateway_ip_list = []
     target = GWTarget(logger,
                       str(target_iqn),
@@ -888,6 +890,14 @@ def disk(image_id):
                                      count=count, controls=controls)
         if disk_usable != 'ok':
             return jsonify(message=disk_usable), 400
+
+        if not size:
+            try:
+                # calculate required values for LUN object
+                rbd_image = RBDDev(image_name, 0, pool)
+                size = rbd_image.current_size
+            except rbd.ImageNotFound:
+                return jsonify(message="Size parameter is required when creating a new image"), 400
 
         if mode == 'reconfigure':
             resp_text, resp_code = lun_reconfigure(image_id, controls)
