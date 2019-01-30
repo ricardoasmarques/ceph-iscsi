@@ -23,21 +23,28 @@ class ChapTest(unittest.TestCase):
         self.logger = logging.getLogger()
         settings.init()
 
-    def test_upgrade_config_v4(self):
+    def test_upgrade_config_v5(self):
         gateway_conf_v3 = json.dumps(self.gateway_conf_v3)
         with mock.patch.object(Config, 'init_config', return_value=True), \
                 mock.patch.object(Config, '_read_config_object', return_value=gateway_conf_v3), \
                 mock.patch.object(Config, 'commit'):
             config = Config(self.logger)
             self.maxDiff = None
+
             iqn = 'iqn.2003-01.com.redhat.iscsi-gw:iscsi-igw'
             self.assertGreater(config.config['targets'][iqn]['created'],
-                               self.gateway_conf_v4['targets'][iqn]['created'])
+                               self.gateway_conf_v5['targets'][iqn]['created'])
             self.assertGreater(config.config['targets'][iqn]['updated'],
-                               self.gateway_conf_v4['targets'][iqn]['updated'])
+                               self.gateway_conf_v5['targets'][iqn]['updated'])
             config.config['targets'][iqn]['created'] = '2018/12/07 09:19:01'
             config.config['targets'][iqn]['updated'] = '2018/12/07 09:19:02'
-            self.assertDictEqual(config.config, self.gateway_conf_v4)
+
+            disk = 'rbd.disk_1'
+            self.assertGreater(config.config['disks'][disk]['updated'],
+                               self.gateway_conf_v5['disks'][disk]['updated'])
+            config.config['disks'][disk]['updated'] = '2018/12/07 09:19:03'
+
+            self.assertDictEqual(config.config, self.gateway_conf_v5)
 
     gateway_conf_v3 = {
         "clients": {
@@ -131,7 +138,7 @@ class ChapTest(unittest.TestCase):
         "version": 3
     }
 
-    gateway_conf_v4 = {
+    gateway_conf_v5 = {
         "created": "2018/12/07 09:18:03",
         "disks": {
             "rbd.disk_1": {
@@ -141,9 +148,10 @@ class ChapTest(unittest.TestCase):
                 "created": "2018/12/07 09:18:04",
                 "image": "disk_1",
                 "owner": "node1",
+                "backstore": "user:rbd",
                 "pool": "rbd",
                 "pool_id": 7,
-                "updated": "2018/12/07 09:18:05",
+                "updated": "2018/12/07 09:19:03",
                 "wwn": "4fc1071d-7e2f-4df0-95c8-925a617e2d62"
             }
         },
@@ -232,5 +240,5 @@ class ChapTest(unittest.TestCase):
             }
         },
         "updated": "2018/12/07 09:18:13",
-        "version": 4
+        "version": 5
     }

@@ -54,7 +54,7 @@ class Config(object):
                    "targets": {},
                    "discovery_auth": {'chap': '',
                                       'chap_mutual': ''},
-                   "version": 4,
+                   "version": 5,
                    "epoch": 0,
                    "created": '',
                    "updated": ''
@@ -211,6 +211,12 @@ class Config(object):
             self.del_item('groups', None)
             self.update_item("gateways", None, gateways)
             self.update_item("version", None, 4)
+
+        if self.config['version'] == 4:
+            for disk_id, disk in self.config['disks'].items():
+                disk['backstore'] = 'user:rbd'
+                self.update_item("disks", disk_id, disk)
+            self.update_item("version", None, 5)
 
         self.commit("retain")
 
