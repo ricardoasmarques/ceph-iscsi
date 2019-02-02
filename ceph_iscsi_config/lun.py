@@ -271,7 +271,7 @@ class LUN(GWObject):
         'rbd'
     ]
 
-    DEFAULT_BACKSTORE = 'user:rbd'  # TODO rimarques
+    DEFAULT_BACKSTORE = 'rbd'  # TODO rimarques
 
     SETTINGS = {
         "user:rbd": [
