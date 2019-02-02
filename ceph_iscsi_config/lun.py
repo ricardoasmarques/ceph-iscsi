@@ -268,7 +268,7 @@ class LUN(GWObject):
         'rbd'
     ]
 
-    DEFAULT_BACKSTORE = 'user:rbd'
+    DEFAULT_BACKSTORE = 'rbd'
 
     SETTINGS = {
         "user:rbd": [
