@@ -215,6 +215,7 @@ class Config(object):
         if self.config['version'] == 4:
             for disk_id, disk in self.config['disks'].items():
                 disk['backstore'] = 'user:rbd'
+                disk['backstore_object_name'] = disk_id
                 self.update_item("disks", disk_id, disk)
             self.update_item("version", None, 5)
 

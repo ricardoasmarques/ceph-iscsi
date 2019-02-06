@@ -284,8 +284,6 @@ class Disks(UIGroup):
 
     def create_disk(self, pool=None, image=None, size=None, count=1,
                     parent=None, create_image=True, backstore=None):
-        if not backstore:
-            backstore = LUN.DEFAULT_BACKSTORE
         rc = 0
 
         if not parent:
