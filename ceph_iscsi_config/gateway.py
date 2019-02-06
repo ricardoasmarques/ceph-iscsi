@@ -350,7 +350,9 @@ class GWTarget(GWObject):
 
         stg_object = lun.storage_object
 
-        owning_gw = config.config['disks'][stg_object.name]['owner']
+        disk_config = [disk for _, disk in config.config['disks'].items()
+                       if disk['backstore_object_name'] == stg_object.name][0]
+        owning_gw = disk_config['owner']
         tpg = lun.parent_tpg
 
         if not tpg_ip_address:
@@ -410,8 +412,10 @@ class GWTarget(GWObject):
 
         lio_root = root.RTSRoot()
         target_config = config.config["targets"][self.iqn]
+        backstore_object_names = [disk['backstore_object_name'] for disk_id, disk in config.config['disks'].items()
+                                  if disk_id in target_config['disks']]
         target_stg_object = [stg_object for stg_object in lio_root.storage_objects
-                             if stg_object.name in target_config['disks']]
+                             if stg_object.name in backstore_object_names]
 
         # process each storage object added to the gateway, and map to the tpg
         for stg_object in target_stg_object:
