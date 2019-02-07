@@ -188,20 +188,21 @@ class GWClient(GWObject):
 
         # NB. this will check all tpg's for a matching iqn
         for tpg in target.tpgs:
-            for client in tpg.node_acls:
-                if client.node_wwn == self.iqn:
-                    self.acl = client
-                    self.tpg = client.parent_tpg
-                    try:
-                        self.update_acl_controls()
-                    except RTSLibError as err:
-                        self.logger.error("(Client.define_client) FAILED to update "
-                                          "{}".format(self.iqn))
-                        self.error = True
-                        self.error_msg = err
-                    self.logger.debug("(Client.define_client) - {} already "
-                                      "defined".format(self.iqn))
-                    return
+            if tpg.enable:
+                for client in tpg.node_acls:
+                    if client.node_wwn == self.iqn:
+                        self.acl = client
+                        self.tpg = client.parent_tpg
+                        try:
+                            self.update_acl_controls()
+                        except RTSLibError as err:
+                            self.logger.error("(Client.define_client) FAILED to update "
+                                              "{}".format(self.iqn))
+                            self.error = True
+                            self.error_msg = err
+                        self.logger.debug("(Client.define_client) - {} already "
+                                          "defined".format(self.iqn))
+                        return
 
         # at this point the client does not exist, so create it
         # The configuration only has one active tpg, so pick that one for any
@@ -390,6 +391,8 @@ class GWClient(GWObject):
                           "id {}".format(image, self.iqn, lun_id))
 
         try:
+            self.logger.debug("(Client._add_lun) Adding {} to {} at "
+                              "id {}".format(image, self.iqn, lun_id))
             m_lun = self.acl.mapped_lun(lun_id, tpg_lun=tpg_lun)
         except RTSLibError as err:
             self.logger.error("Client.add_lun RTSLibError for lun id {} -"
