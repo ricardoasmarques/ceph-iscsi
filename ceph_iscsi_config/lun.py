@@ -1,13 +1,16 @@
 #!/usr/bin/env python
 
+import glob
+import os
 import rados
 import rbd
 import re
+import subprocess
 
 from time import sleep
 from socket import gethostname
 
-from rtslib_fb import UserBackedStorageObject, root
+from rtslib_fb import UserBackedStorageObject, RBDStorageObject, root
 from rtslib_fb.utils import RTSLibError
 
 import ceph_iscsi_config.settings as settings
@@ -33,13 +36,20 @@ class RBDDev(object):
             'RBD_FEATURE_OBJECT_MAP',
             'RBD_FEATURE_FAST_DIFF',
             'RBD_FEATURE_DEEP_FLATTEN'
+        ],
+        'rbd': [
+            'RBD_FEATURE_LAYERING',
+            'RBD_FEATURE_STRIPINGV2',
+            'RBD_FEATURE_EXCLUSIVE_LOCK',
+            'RBD_FEATURE_DATA_POOL'
         ]
     }
 
     required_features_list = {
         'user:rbd': [
             'RBD_FEATURE_EXCLUSIVE_LOCK'
-        ]
+        ],
+        'rbd': []
     }
 
     def __init__(self, image, size, backstore, pool='rbd'):
@@ -254,7 +264,8 @@ class RBDDev(object):
 
 class LUN(GWObject):
     BACKSTORES = [
-        'user:rbd'
+        'user:rbd',
+        'rbd'
     ]
 
     DEFAULT_BACKSTORE = 'user:rbd'
@@ -265,6 +276,35 @@ class LUN(GWObject):
             "qfull_timeout",
             "osd_op_timeout",
             "hw_max_sectors"
+        ],
+        "rbd": [
+            "block_size",
+            "emulate_3pc",
+            "emulate_caw",
+            "emulate_dpo",
+            "emulate_fua_read",
+            "emulate_fua_write",
+            "emulate_model_alias",
+            "emulate_pr",
+            "emulate_rest_reord",
+            "emulate_tas",
+            "emulate_tpu",
+            "emulate_tpws",
+            "emulate_ua_intlck_ctrl",
+            "emulate_write_cache",
+            "enforce_pr_isids",
+            "force_pr_aptpl",
+            "is_nonrot",
+            "max_unmap_block_desc_count",
+            "max_unmap_lba_count",
+            "max_write_same_len",
+            "optimal_sectors",
+            "pi_prot_type",
+            "pi_prot_verify",
+            "queue_depth",
+            "unmap_granularity",
+            "unmap_granularity_alignment",
+            "unmap_zeroes_data"
         ]
     }
 
@@ -816,6 +856,9 @@ class LUN(GWObject):
         if self.backstore == 'user:rbd':
             new_lun = self._add_dev_to_lio_user_rbd(in_wwn)
 
+        elif self.backstore == 'rbd':
+            new_lun = self._add_dev_to_lio_rbd(in_wwn)
+
         else:
             raise CephiSCSIError("Error adding device to lio - "
                                  "Unsupported backstore {}".format(self.backstore))
@@ -879,6 +922,78 @@ class LUN(GWObject):
 
         return new_lun
 
+    def _add_dev_to_lio_rbd(self, in_wwn=None):
+        """
+        Add an rbd device to the LIO configuration ('rbd' backstore)
+        :param in_wwn: optional wwn identifying the rbd image to clients
+        (must match across gateways)
+        :return: LIO LUN object
+        """
+        new_lun = None
+        try:
+            self._load_modules()
+            self._rbd_device_map()
+            dev = '/dev/rbd/{}/{}'.format(self.pool, self.image)
+            new_lun = RBDStorageObject(name=self.backstore_object_name,
+                                       dev=dev,
+                                       wwn=in_wwn)
+
+        except (RTSLibError, IOError) as err:
+            self.error = True
+            self.error_msg = ("failed to add {} to LIO - "
+                              "error({})".format(self.config_key,
+                                                 str(err)))
+            self.logger.error(self.error_msg)
+            return None
+
+        self._set_controls()
+
+        return new_lun
+
+    def _set_controls(self):
+        paths = glob.glob("{}/{}/{}".format('/sys/kernel/config/target',
+                                            'core',
+                                            'rbd_*/{}/attrib'.format(self.backstore_object_name)))
+        for base in paths:
+            for attr in self.controls.keys():
+                path = base + "/" + attr
+                self.logger.debug("Backstore attribute path {}".format(path))
+                if not os.path.isfile(path):
+                    raise RuntimeError("No such attribute {}".format(attr))
+                content = open(path).read().rstrip('\n')
+                if self.controls[attr] != content:
+                    try:
+                        self.logger.info("Setting {} to {}".format(attr, self.controls[attr]))
+                        file_attr = open(path, "w")
+                        file_attr.write(str(self.controls[attr]) + "\n")
+                        file_attr.close()
+                    except IOError:
+                        # Already in use
+                        pass
+
+    def _load_modules(self):
+        modules = ["iscsi_target_mod", "target_core_rbd"]
+        for module in modules:
+            if not os.path.isdir("/sys/module/{}".format(module)):
+                proc = subprocess.Popen(["modprobe", module])
+                retcode = proc.wait()
+                if retcode != 0:
+                    raise CephiSCSIError("Error loading module {}".format(module))
+
+    def _rbd_device_map(self):
+        if not os.path.exists("/dev/rbd/{}/{}".format(self.pool, self.image)):
+            proc = subprocess.Popen(["rbd", "device", "map", "-p", self.pool, self.image])
+            retcode = proc.wait()
+            if retcode != 0:
+                raise CephiSCSIError("Error mapping device {}.{}".format(self.pool, self.image))
+
+    def _rbd_device_unmap(self):
+        if os.path.exists("/dev/rbd/{}/{}".format(self.pool, self.image)):
+            proc = subprocess.Popen(["rbd", "device", "unmap", "-p", self.pool, self.image])
+            retcode = proc.wait()
+            if retcode != 0:
+                raise CephiSCSIError("Error unmapping device {}.{}".format(self.pool, self.image))
+
     def remove_dev_from_lio(self):
         lio_root = root.RTSRoot()
 
@@ -900,6 +1015,8 @@ class LUN(GWObject):
             if stg_object.name == self.backstore_object_name:
                 try:
                     stg_object.delete()
+                    if self.backstore == 'rbd':
+                        self._rbd_device_unmap()
                 except Exception as e:
                     self.error = True
                     self.error_msg = ("Delete from LIO/backstores failed - "
