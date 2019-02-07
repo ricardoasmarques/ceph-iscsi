@@ -1,3 +1,4 @@
+import glob
 import os
 
 from rtslib_fb.target import Target, TPG, NetworkPortal, LUN
@@ -35,9 +36,17 @@ class GWTarget(GWObject):
         "max_recv_data_segment_length",
         "max_xmit_data_segment_length"]
 
+    TPG_KERNEL_SETTINGS = [
+        "default_cmdsn_depth",
+        "default_erl",
+        "login_timeout",
+        "netif_timeout",
+        "prod_mode_write_protect",
+        "t10_pi"]
+
     # Settings for all transport/fabric objects. Using this allows apps like
     # gwcli to get/set all tpgs/clients under the target instead of per obj.
-    SETTINGS = TPG_SETTINGS + GWClient.SETTINGS
+    SETTINGS = TPG_SETTINGS + TPG_KERNEL_SETTINGS + GWClient.SETTINGS
 
     def __init__(self, logger, iqn, gateway_ip_list, enable_portal=True):
         """
@@ -173,6 +182,21 @@ class GWTarget(GWObject):
                               str(self.max_recv_data_segment_length))
             tpg.set_parameter('MaxXmitDataSegmentLength',
                               str(self.max_xmit_data_segment_length))
+
+            paths = glob.glob("{}/{}/{}".format('/sys/kernel/config/target',
+                                                'iscsi',
+                                                '{}/tpgt_*/attrib'.format(self.iqn)))
+            for base in paths:
+                for attr in GWTarget.TPG_KERNEL_SETTINGS:
+                    path = base + "/" + attr
+                    self.logger.debug("TPG attribute path {}".format(path))
+                    if not os.path.isfile(path):
+                        raise RuntimeError("No such attribute {}".format(attr))
+                    content = open(path).read().rstrip('\n')
+                    if getattr(self, attr) != content:
+                        self.logger.info("Setting {} to {}".format(attr, getattr(self, attr)))
+                        with open(path, "w") as file_attr:
+                            file_attr.write(str(getattr(self, attr)) + "\n")
 
     def enable_active_tpg(self, config):
         """
