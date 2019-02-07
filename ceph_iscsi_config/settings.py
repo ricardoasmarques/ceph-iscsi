@@ -176,7 +176,42 @@ class Settings(object):
                        "max_xmit_data_segment_length": 262144,
                        "max_data_area_mb": 8,
                        "alua_failover_type": "implicit",
-                       "hw_max_sectors": "1024"
+                       "hw_max_sectors": "1024",
+
+                       "block_size": 512,
+                       "emulate_3pc": 1,
+                       "emulate_caw": 1,
+                       "emulate_dpo": 1,
+                       "emulate_fua_read": 1,
+                       "emulate_fua_write": 1,
+                       "emulate_model_alias": 0,
+                       "emulate_pr": 1,
+                       "emulate_rest_reord": 1,
+                       "emulate_tas": 1,
+                       "emulate_tpu": 0,
+                       "emulate_tpws": 0,
+                       "emulate_ua_intlck_ctrl": 0,
+                       "emulate_write_cache": 0,
+                       "enforce_pr_isids": 1,
+                       "force_pr_aptpl": 0,
+                       "is_nonrot": 1,
+                       "max_unmap_block_desc_count": 1,
+                       "max_unmap_lba_count": 8192,
+                       "max_write_same_len": 65535,
+                       "optimal_sectors": 8192,
+                       "pi_prot_type": 0,
+                       "pi_prot_verify": 0,
+                       "queue_depth": 256,
+                       "unmap_granularity": 8192,
+                       "unmap_granularity_alignment": 0,
+                       "unmap_zeroes_data": 8192,
+
+                       "default_cmdsn_depth": 64,
+                       "default_erl": 0,
+                       "login_timeout": 15,
+                       "netif_timeout": 2,
+                       "prod_mode_write_protect": 0,
+                       "t10_pi": 0
                        }
 
     def __init__(self, conffile='/etc/ceph/iscsi-gateway.cfg'):
