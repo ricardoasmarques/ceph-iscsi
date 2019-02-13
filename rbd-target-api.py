@@ -14,7 +14,7 @@ import threading
 import time
 import inspect
 import re
-import platform
+import distro
 
 from functools import (reduce, wraps)
 from rpm import labelCompare
@@ -2272,12 +2272,14 @@ def pre_reqs_errors():
     """
 
     dist_translations = {
-        "centos": "redhat"}
+        "centos": "redhat",
+        "opensuse-leap": "suse"}
     valid_dists = {
-        "redhat": 7.4}
+        "redhat": 7.4,
+        "suse": 15.1}
 
     required_rpms = [
-        {"name": "python-rtslib",
+        {"name": "python3-rtslib",
          "version": "2.1.fb64",
          "release": "0.1"},
         {"name": "tcmu-runner",
@@ -2290,9 +2292,8 @@ def pre_reqs_errors():
 
     errors_found = []
 
-    dist, rel, dist_id = platform.linux_distribution(full_distribution_name=0)
-
-    dist = dist.lower()
+    rel = distro.version(best=True)
+    dist = distro.id().lower()
     dist = dist_translations.get(dist, dist)
     if dist in valid_dists:
         # CentOS formats a release similar 7.4.1708

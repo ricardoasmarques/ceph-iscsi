@@ -319,8 +319,13 @@ def valid_rpm(in_rpm):
     mi = ts.dbMatch('name', in_rpm['name'])
     if mi:
         # check the version is OK
-        rpm_hdr = mi.next()
-        rc = rpm.labelCompare(('1', rpm_hdr['version'], rpm_hdr['release']),
+        try:
+            # python2
+            rpm_hdr = mi.next()
+        except AttributeError:
+            # python3
+            rpm_hdr = mi.__next__()
+        rc = rpm.labelCompare(('1', rpm_hdr['version'].decode('utf-8'), rpm_hdr['release'].decode('utf-8')),
                               ('1', in_rpm['version'], in_rpm['release']))
 
         if rc < 0:

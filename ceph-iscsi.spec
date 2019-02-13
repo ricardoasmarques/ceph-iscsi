@@ -36,6 +36,7 @@ Requires:	python-netifaces >= 0.10.4
 Requires:	python-rtslib >= 2.1.fb67
 Requires:	rpm-python >= 4.11
 Requires:	python-cryptography
+Requires:	python2-distro
 Requires:	python-flask >= 0.10.1
 
 BuildRequires:  python-devel
