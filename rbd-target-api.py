@@ -885,9 +885,9 @@ def get_disks():
     return jsonify(response), 200
 
 
-@app.route('/api/disk/<image_id>', methods=['GET', 'PUT', 'DELETE'])
+@app.route('/api/disk/<pool>/<image>', methods=['GET', 'PUT', 'DELETE'])
 @requires_restricted_auth
-def disk(image_id):
+def disk(pool, image):
     """
     Coordinate the create/delete of rbd images across the gateway nodes
     This method calls the corresponding disk api entrypoints across each
@@ -914,6 +914,8 @@ def disk(image_id):
     curl --insecure --user admin:admin -X GET https://192.168.122.69:5000/api/disk/rbd.new2_1
     curl --insecure --user admin:admin -X DELETE https://192.168.122.69:5000/api/disk/rbd.new2_1
     """
+
+    logger.warn("### pool={} image={}".format(pool, image))
 
     local_gw = this_host()
     logger.debug("this host is {}".format(local_gw))
@@ -956,10 +958,8 @@ def disk(image_id):
                                        "{}".format(err)), 500
             logger.debug("{} controls {}".format(mode, controls))
 
-        pool, image_name = image_id.split('.')
-
         disk_usable = LUN.valid_disk(config, logger, pool=pool,
-                                     image=image_name, size=size, mode=mode,
+                                     image=image, size=size, mode=mode,
                                      count=count, controls=controls)
         if disk_usable != 'ok':
             return jsonify(message=disk_usable), 400
@@ -967,7 +967,7 @@ def disk(image_id):
         create_image = request.form.get('create_image') == 'true'
         if not create_image or not size:
             try:
-                rbd_image = RBDDev(image_name, 0, pool)
+                rbd_image = RBDDev(image, 0, pool)
                 size = rbd_image.current_size
             except rbd.ImageNotFound:
                 if not create_image:
@@ -989,16 +989,14 @@ def disk(image_id):
 
         for sfx in suffixes:
 
-            image_name = image_id if count == '1' else "{}{}".format(image_id,
-                                                                     sfx)
+            image_name = image if count == '1' else "{}{}".format(image, sfx)
 
-            api_vars = {'pool': pool, 'size': size, 'owner': local_gw,
-                        'mode': mode}
+            api_vars = {'size': size, 'owner': local_gw, 'mode': mode}
             if 'controls' in request.form:
                 api_vars['controls'] = request.form['controls']
 
             resp_text, resp_code = call_api(gateways, '_disk',
-                                            image_name,
+                                            '{}/{}'.format(pool, image_name),
                                             http_method='put',
                                             api_vars=api_vars)
 
@@ -1011,9 +1009,8 @@ def disk(image_id):
 
     else:
         # this is a DELETE request
-        pool_name, image_name = image_id.split('.')
         disk_usable = LUN.valid_disk(config, logger, mode='delete',
-                                     pool=pool_name, image=image_name)
+                                     pool=pool, image=image)
 
         if disk_usable != 'ok':
             return jsonify(message=disk_usable), 400
@@ -1027,7 +1024,7 @@ def disk(image_id):
         gateways.append(local_gw)
 
         resp_text, resp_code = call_api(gateways, '_disk',
-                                        image_id,
+                                        '{}/{}'.format(pool, image_name),
                                         http_method='delete',
                                         api_vars=api_vars)
 
@@ -1035,9 +1032,9 @@ def disk(image_id):
             resp_code
 
 
-@app.route('/api/_disk/<image_id>', methods=['GET', 'PUT', 'DELETE'])
+@app.route('/api/_disk/<pool>/<image>', methods=['GET', 'PUT', 'DELETE'])
 @requires_restricted_auth
-def _disk(image_id):
+def _disk(pool, image):
     """
     Manage a disk definition on the local gateway
     Internal Use ONLY
@@ -1046,6 +1043,8 @@ def _disk(image_id):
     :param image_id: (str) of the form pool.image_name
     **RESTRICTED**
     """
+
+    image_id = '{}.{}'.format(pool, image)
 
     if request.method == 'GET':
         if image_id in config.config['disks']:
@@ -1057,10 +1056,9 @@ def _disk(image_id):
 
     elif request.method == 'PUT':
         # A put is for either a create or a resize
-        # put('http://localhost:5000/api/disk/rbd.ansible3',
-        #     data={'pool': 'rbd','size': '3G','owner':'ceph-1'})
+        # put('http://localhost:5000/api/disk/rbd/ansible3',
+        #     data={'size': '3G','owner':'ceph-1'})
 
-        pool_name, image_name = image_id.split('.', 1)
         mode = request.form['mode']
 
         controls = {}
@@ -1076,14 +1074,14 @@ def _disk(image_id):
 
         if mode in ['create', 'resize']:
             rqst_fields = set(request.form.keys())
-            if not rqst_fields.issuperset(("pool", "size", "owner", "mode")):
+            if not rqst_fields.issuperset(("size", "owner", "mode")):
                 # this is an invalid request
                 return jsonify(message="Invalid Request - need to provide "
-                                       "pool, size and owner"), 400
+                                       "size and owner"), 400
 
             lun = LUN(logger,
-                      str(request.form['pool']),
-                      image_name,
+                      pool,
+                      image,
                       str(request.form['size']),
                       str(request.form['owner']))
             if lun.error:
@@ -1112,7 +1110,7 @@ def _disk(image_id):
                                        "found".format(image_id)), 404
 
             # calculate required values for LUN object
-            rbd_image = RBDDev(image_name, 0, pool_name)
+            rbd_image = RBDDev(image, 0, pool)
             size = rbd_image.current_size
             if not size:
                 logger.error("LUN size unknown - {}".format(image_id))
@@ -1123,7 +1121,7 @@ def _disk(image_id):
                 logger.error("LUN owner not defined - {}".format(msg))
                 return jsonify(message="LUN {} failure - {}".format(mode, msg)), 400
 
-            lun = LUN(logger, pool_name, image_name, size, disk['owner'])
+            lun = LUN(logger, pool, image, size, disk['owner'])
             if mode == 'deactivate':
                 try:
                     lun.deactivate()

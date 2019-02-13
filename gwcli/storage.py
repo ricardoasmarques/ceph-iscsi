@@ -54,7 +54,7 @@ class Disks(UIGroup):
         self.scan_queue = None
         self.scan_mutex = None
 
-    def _get_disk_meta(self, cluster_ioctx, disk_meta):
+    def _get_disk_meta(self, cluster_ioctx, disk_meta, config):
         """
         Use the provided cluster context to take an rbd image name from the
         queue and extract size and feature code. The resulting data is then
@@ -73,7 +73,9 @@ class Disks(UIGroup):
             except Queue.Empty:
                 break
             else:
-                pool, image = rbd_name.split('.')
+                disk_config = config['disks'][rbd_name]
+                pool = disk_config['pool']
+                image = disk_config['image']
                 disk_meta[rbd_name] = {}
                 with cluster_ioctx.open_ioctx(pool) as ioctx:
                     try:
@@ -119,12 +121,13 @@ class Disks(UIGroup):
 
         start_time = int(time.time())
         scan_threads = []
+        config = get_config()
         # Open a connection to the cluster
         with rados.Rados(conffile=settings.config.cephconf) as cluster:
             # Initiate the scan threads
             for _t in range(0, self.scan_threads, 1):
                 _thread = threading.Thread(target=self._get_disk_meta,
-                                           args=(cluster, disk_meta))
+                                           args=(cluster, disk_meta, config))
                 _thread.start()
                 scan_threads.append(_thread)
 
@@ -169,7 +172,7 @@ class Disks(UIGroup):
 
         """
 
-        if pool and '.' in pool:
+        if pool and not image and pool.count('.') == 1:
             # shorthand version of the command
             self.logger.debug("user provided pool.image format request")
 
@@ -300,9 +303,9 @@ class Disks(UIGroup):
                                                                image))
 
         # make call to local api server's disk endpoint
-        disk_api = '{}://localhost:{}/api/disk/{}'.format(self.http_mode,
+        disk_api = '{}://localhost:{}/api/disk/{}/{}'.format(self.http_mode,
                                                           settings.config.api_port,
-                                                          disk_key)
+                                                          pool, image)
 
         api_vars = {'pool': pool, 'owner': local_gw,
                     'count': count, 'mode': 'create',
