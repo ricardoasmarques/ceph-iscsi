@@ -176,18 +176,11 @@ def get_remote_gateways(config, logger, local_gw_required=True):
     return gateways
 
 
-def valid_credentials(credentials_str, auth_type='chap'):
+def valid_credentials(user, password, auth_type='chap'):
     """
     Return a boolean indicating whether the credentials supplied are
     acceptable
     """
-
-    # regardless of the auth_type, the credentials_str must be of
-    # for form <username>/<password>
-    try:
-        user_name, password = credentials_str.split('/')
-    except ValueError:
-        return False
 
     if auth_type == 'chap':
         # username is 8-64 chars long containing any alphanumeric in
@@ -196,7 +189,7 @@ def valid_credentials(credentials_str, auth_type='chap'):
         # [0-9a-zA-Z] and '@' '-' '_' or !,_,& symbol
         usr_regex = re.compile(r"^[\w\\.\:\@\_\-]{8,64}$")
         pw_regex = re.compile(r"^[\w\@\-\_]{12,16}$")
-        if not usr_regex.search(user_name) or not pw_regex.search(password):
+        if not usr_regex.search(user) or not pw_regex.search(password):
             return False
 
         return True
@@ -285,18 +278,19 @@ def valid_client(**kwargs):
         return 'ok'
 
     elif mode == 'auth':
-        chap = kwargs['chap']
+        user = kwargs['user']
+        password = kwargs['password']
         # client iqn must exist
         if client_iqn not in target_config['clients']:
             return ("Client '{}' does not exist".format(client_iqn))
 
         # must provide chap as either '' or a user/password string
-        if 'chap' not in kwargs:
-            return ("Client auth needs 'chap' defined")
+        if 'user' not in kwargs and 'password' not in kwargs:
+            return ("Client auth needs 'user' and 'password' defined")
 
         # credentials string must be valid
-        if chap:
-            if not valid_credentials(chap):
+        if user:
+            if not valid_credentials(user, password):
                 return ("Invalid format for CHAP credentials. Refer to 'help' "
                         "or documentation for the correct format")
 

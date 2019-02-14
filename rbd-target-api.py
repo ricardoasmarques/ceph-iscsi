@@ -1508,8 +1508,10 @@ def _update_client(**kwargs):
     client = GWClient(logger,
                       kwargs['client_iqn'],
                       image_list,
-                      kwargs['chap'],
-                      kwargs['chap_mutual'],
+                      kwargs['user'],
+                      kwargs['password'],
+                      kwargs['mutual_user'],
+                      kwargs['mutual_password'],
                       kwargs['target_iqn'])
 
     if client.error:
@@ -1574,12 +1576,16 @@ def clientauth(target_iqn, client_iqn):
 
     lun_list = target_config['clients'][client_iqn]['luns'].keys()
     image_list = ','.join(lun_list)
-    chap = request.form.get('chap')
-    chap_mutual = request.form.get('chap_mutual')
+    user = request.form.get('user')
+    password = request.form.get('password')
+    mutual_user = request.form.get('mutual_user')
+    mutual_password = request.form.get('mutual_password')
 
+    # TODO rimarques - mutual
     client_usable = valid_client(mode='auth',
                                  client_iqn=client_iqn,
-                                 chap=chap,
+                                 user=user,
+                                 password=password,
                                  target_iqn=target_iqn)
     if client_usable != 'ok':
         logger.error("BAD auth request from {}".format(request.remote_addr))
@@ -1587,8 +1593,10 @@ def clientauth(target_iqn, client_iqn):
 
     api_vars = {"committing_host": this_host(),
                 "image_list": image_list,
-                "chap": chap,
-                "chap_mutual": chap_mutual}
+                "user": user,
+                "password": password,
+                "mutual_user": mutual_user,
+                "mutual_password": mutual_password}
 
     gateways.insert(0, 'localhost')
 
@@ -1614,13 +1622,18 @@ def _clientauth(target_iqn, client_iqn):
 
     # PUT request to define/change authentication
     image_list = request.form['image_list']
-    chap = request.form['chap']
-    chap_mutual = request.form['chap_mutual']
+    user = request.form['user']
+    password = request.form['password']
+    mutual_user = request.form['mutual_user']
+    mutual_password = request.form['mutual_password']
     committing_host = request.form['committing_host']
 
     status_code, status_text = _update_client(client_iqn=client_iqn,
                                               images=image_list,
-                                              chap=chap,
+                                              user=user,
+                                              password=password,
+                                              mutual_user=mutual_user,
+                                              mutual_password=mutual_password,
                                               chap_mutual=chap_mutual,
                                               committing_host=committing_host,
                                               target_iqn=target_iqn)

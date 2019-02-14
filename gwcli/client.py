@@ -348,45 +348,37 @@ class Client(UINode):
 
         return ", ".join(msg), status
 
-    def set_auth(self, chap=None, chap_mutual=None):
+    def set_auth(self, user=None, password=None, mutual_user=None, mutual_password=None):
 
-        self.logger.warn("chap={}, chap_mutual={}".format(chap, chap_mutual))
+        self.logger.warn("user={}, password={}, mutual_user={}, mutual_password={}".format(user, password, mutual_user, mutual_password))
 
         self.logger.debug("CMD: ../hosts/<client_iqn> auth *")
 
-        if not chap:
+        if not user:
+            # TODO rimarques
             self.logger.error("To set or reset authentication, specify either "
                               "chap=<user>/<password> [chap_mutual]=<user>/<password> or nochap")
             return
 
-        if chap == 'nochap':
-            chap = ''
-        else:
-            # string could have been supplied as chap=user/password or
-            # simply user/password - either way all we see is user/password
-            if '/' not in chap:
-                self.logger.error(
-                    "CHAP format is invalid - must be a <username>/<password> "
-                    "format. Use 'help auth' to show the correct syntax and "
-                    "supported characters")
-                return
+        if user == 'nochap':
+            user = ''
+            password = ''
 
-        if not chap_mutual:
-            chap_mutual = ''
-        else:
-            if '/' not in chap_mutual:
-                self.logger.error(
-                    "CHAP_MUTUAL format is invalid - must be a <username>/<password> "
-                    "format. Use 'help auth' to show the correct syntax and "
-                    "supported characters")
-                return
+        if not mutual_user:
+            mutual_user = ''
+            mutual_password = ''
 
-        self.logger.debug("auth to be set to chap='{}', chap_mutual='{}' for '{}'".format(
-            chap, chap_mutual, self.client_iqn))
+        self.logger.debug("auth to be set to user='{}', password='{}', mutual_user='{}', mutual_password='{}' for '{}'".format(
+            user, password, mutual_user, mutual_password, self.client_iqn))
 
         target_iqn = self.parent.parent.name
 
-        api_vars = {"chap": chap, "chap_mutual": chap_mutual}
+        api_vars = {
+            "user": user,
+            "password": password,
+            "mutual_user": mutual_user,
+            "mutual_password": mutual_password
+        }
 
         clientauth_api = ('{}://localhost:{}/api/'
                           'clientauth/{}/{}'.format(self.http_mode,
@@ -399,14 +391,15 @@ class Client(UINode):
 
         if api.response.status_code == 200:
             self.logger.debug("- client credentials updated")
-            if chap != '':
-                self.auth['chap'] = chap
-            else:
-                self.auth['chap'] = "None"
-            if chap_mutual != '':
-                self.auth['chap_mutual'] = chap_mutual
-            else:
-                self.auth['chap_mutual'] = "None"
+            # TODO rimarques
+            #if chap != '':
+            #    self.auth['chap'] = chap
+            #else:
+            #    self.auth['chap'] = "None"
+            #if chap_mutual != '':
+            #    self.auth['chap_mutual'] = chap_mutual
+            #else:
+            #    self.auth['chap_mutual'] = "None"
 
             self.logger.info('ok')
 
@@ -416,7 +409,7 @@ class Client(UINode):
                                                              self.logger)))
             return
 
-    def ui_command_auth(self, chap=None, chap_mutual=None):
+    def ui_command_auth(self, user=None, password=None, mutual_user=None, mutual_password=None):
         """
         Client authentication can be set to use CHAP/CHAP_MUTUAL by supplying
         strings of the form <username>/<password>
@@ -445,7 +438,8 @@ class Client(UINode):
 
         self.logger.debug("CMD: ../hosts/<client_iqn> auth *")
 
-        if not chap:
+        if not user:
+            # TODO rimarques
             self.logger.error("To set authentication, specify "
                               "chap=<user>/<password> [chap_mutual]=<user>/<password>")
             return

@@ -34,7 +34,7 @@ class GWClient(GWObject):
                      "group_name": ""
                      }
 
-    def __init__(self, logger, client_iqn, image_list, chap, chap_mutual, target_iqn):
+    def __init__(self, logger, client_iqn, image_list, user, password, mutual_user, mutual_password, target_iqn):
         """
         Instantiate an instance of an LIO client
         :param client_iqn: (str) iscsi iqn string
@@ -65,8 +65,10 @@ class GWClient(GWObject):
             else:
                 self.requested_images = image_list
 
-        self.chap = chap                        # parameters for auth
-        self.chap_mutual = chap_mutual          # parameters for mutual auth
+        self.user = user
+        self.password = password
+        self.mutual_user = mutual_user
+        self.mutual_password = mutual_password
         self.mutual = ''
         self.tpgauth = ''
         self.metadata = {}
@@ -530,7 +532,7 @@ class GWClient(GWObject):
                     self.error_msg = config_chap_mutual.error_msg
                     return
 
-                if self.chap == chap_str and \
+                if self.user == config_chap.user and \
                    self.chap_mutual == chap_mutual_str and \
                    config_image_list == sorted(self.requested_images):
                     self.commit_enabled = False
@@ -689,21 +691,26 @@ class GWClient(GWObject):
 
 class CHAP(object):
 
-    def __init__(self, chap_str):
+    def __init__(self, user, password):
 
         self.error = False
         self.error_msg = ''
 
-        if '/' in chap_str:
-            self.user, self.password_str = chap_str.split('/', 1)
+        self.user = user
+        self.password = password
+        if len(password) > 16 and encryption_available():
+            self.password = self._decrypt()
 
-            if len(self.password_str) > 16 and encryption_available():
-                self.password = self._decrypt()
-            else:
-                self.password = self.password_str
-        else:
-            self.user = ''
-            self.password = ''
+        #if '/' in chap_str:
+        #    self.user, self.password_str = chap_str.split('/', 1)
+#
+        #    if len(self.password_str) > 16 and encryption_available():
+        #        self.password = self._decrypt()
+        #    else:
+        #        self.password = self.password_str
+        #else:
+        #    self.user = ''
+        #    self.password = ''
 
     def _get_chap_str(self):
         if len(self.password) > 0:
