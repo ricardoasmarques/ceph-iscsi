@@ -530,8 +530,8 @@ class Client(UINode):
                 ui_root = self.get_ui_root()
                 ui_disks = ui_root.disks
 
-                # a disk given here would be of the form pool.image
-                pool, image = disk.split('.')
+                # a disk given here would be of the form pool/image
+                pool, image = disk.split('/')
                 rc = ui_disks.create_disk(pool=pool, image=image, size=size)
                 if rc == 0:
                     self.logger.debug("disk auto-define successful")

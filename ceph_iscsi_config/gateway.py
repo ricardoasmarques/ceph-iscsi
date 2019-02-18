@@ -412,7 +412,8 @@ class GWTarget(GWObject):
 
         lio_root = root.RTSRoot()
         target_config = config.config["targets"][self.iqn]
-        backstore_object_names = [disk['backstore_object_name'] for disk_id, disk in config.config['disks'].items()
+        backstore_object_names = [disk['backstore_object_name'] for disk_id, disk
+                                  in config.config['disks'].items()
                                   if disk_id in target_config['disks']]
         target_stg_object = [stg_object for stg_object in lio_root.storage_objects
                              if stg_object.name in backstore_object_names]
