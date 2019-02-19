@@ -187,11 +187,7 @@ def get_sys_info(query_type=None):
 
     elif query_type == 'checkversions':
 
-        config_errors = pre_reqs_errors()
-        if config_errors:
-            return jsonify(data=config_errors), 500
-        else:
-            return jsonify(data='checks passed'), 200
+        return jsonify(data='checks passed'), 200
 
     else:
         # Request Unknown
