@@ -30,6 +30,7 @@ class CephCluster(object):
         self.error = False
         self.error_msg = ''
         self.cluster = rados.Rados(conffile=settings.config.cephconf,
+                                   name=settings.config.cluster_client_name,
                                    conf=dict(keyring="{}/{}".format(
                                              settings.config.ceph_config_dir,
                                              settings.config.gateway_keyring)))

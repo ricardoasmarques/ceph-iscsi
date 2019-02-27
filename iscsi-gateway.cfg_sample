@@ -7,6 +7,8 @@ cluster_name = <ceph cluster name>
 # drectory and reference the filename here
 gateway_keyring = <client.admin.keyring>
 
+cluster_client_name = client.<rados_id>  # E.g. client.admin
+
 
 # API settings.
 # The api supports a number of options that allow you to tailor it to your
