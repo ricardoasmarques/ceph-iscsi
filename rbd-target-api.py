@@ -280,6 +280,7 @@ def target(target_iqn=None):
 
         gateway_ip_list = []
         target = GWTarget(logger,
+                          config,
                           str(target_iqn),
                           gateway_ip_list)
 
@@ -368,7 +369,7 @@ def target(target_iqn=None):
 def local_target_reconfigure(target_iqn, tpg_controls, client_controls):
     config.refresh()
 
-    target = GWTarget(logger, str(target_iqn), [])
+    target = GWTarget(logger, config, str(target_iqn), [])
     if target.error:
         logger.error("Unable to create an instance of the GWTarget class")
         return target.error_msg
@@ -473,7 +474,7 @@ def _target(target_iqn=None):
 
     else:
         # DELETE target request
-        target = GWTarget(logger, target_iqn, '')
+        target = GWTarget(logger, config, target_iqn, '')
         if target.error:
             return jsonify(message="Failed to access target"), 500
 
@@ -842,6 +843,7 @@ def _target_disk(target_iqn=None):
         target_config = config.config['targets'][target_iqn]
         ip_list = target_config.get('ip_list', [])
         gateway = GWTarget(logger,
+                           config,
                            target_iqn,
                            ip_list)
 
@@ -1605,7 +1607,7 @@ def _targetauth(target_iqn=None):
     committing_host = request.form['committing_host']
     action = request.form['action']
 
-    target = GWTarget(logger, target_iqn, [])
+    target = GWTarget(logger, config, target_iqn, [])
 
     acl_enabled = (action == 'enable_acl')
 
