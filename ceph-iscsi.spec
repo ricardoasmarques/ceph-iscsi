@@ -68,6 +68,10 @@ Requires:       python3-configshell >= 1.1.fb23
 %endif
 %endif
 
+%if 0%{?suse_version}
+Conflicts: lrbd
+%endif
+
 BuildRequires: systemd-rpm-macros
 %{?systemd_requires}
 
