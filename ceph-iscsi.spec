@@ -61,7 +61,7 @@ Requires:       python3-rpm >= 4.11
 BuildRequires:  python-rpm-macros
 BuildRequires:  fdupes
 Requires:       python3-Flask >= 0.10.1
-Requires:       python3-configshell-fb >= 1.1.23
+Requires:       python3-configshell-fb >= 1.1.fb23
 %else
 Requires:       python3-flask >= 0.10.1
 Requires:       python3-configshell >= 1.1.fb23
