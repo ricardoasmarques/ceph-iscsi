@@ -51,7 +51,41 @@ class Settings(object):
         "max_data_area_mb": {
             "min": 1, "max": 2048},
         "osd_op_timeout": {
-            "min": 0, "max": 600}
+            "min": 0, "max": 600},
+
+        "emulate_3pc": {
+            "min": 0, "max": 1},
+        "emulate_caw": {
+            "min": 0, "max": 1},
+        "emulate_dpo": {
+            "min": 0, "max": 1},
+        "emulate_fua_read": {
+            "min": 0, "max": 1},
+        "emulate_fua_write": {
+            "min": 0, "max": 1},
+        "emulate_model_alias": {
+            "min": 0, "max": 1},
+        "emulate_pr": {
+            "min": 0, "max": 1},
+        "emulate_rest_reord": {
+            "min": 0, "max": 1},
+        "emulate_tas": {
+            "min": 0, "max": 1},
+        "emulate_tpu": {
+            "min": 0, "max": 1},
+        "emulate_tpws": {
+            "min": 0, "max": 1},
+        "emulate_ua_intlck_ctrl": {
+            "min": 0, "max": 1},
+        "emulate_write_cache": {
+            "min": 0, "max": 1},
+        "enforce_pr_isids": {
+            "min": 0, "max": 1},
+        "is_nonrot": {
+            "min": 0, "max": 1},
+
+        "prod_mode_write_protect": {
+            "min": 0, "max": 1},
     }
 
     _float_regex = re.compile(r"^[0-9]*\.{1}[0-9]$")
