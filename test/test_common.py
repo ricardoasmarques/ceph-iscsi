@@ -244,6 +244,14 @@ class ChapTest(unittest.TestCase):
                             "192.168.100.201",
                             "192.168.100.202"
                         ],
+                        "auth": {
+                            "username": "",
+                            "password": "",
+                            "password_encryption_enabled": False,
+                            "mutual_username": "",
+                            "mutual_password": "",
+                            "mutual_password_encryption_enabled": False
+                        },
                         "inactive_portal_ips": [
                             "192.168.100.202"
                         ],
@@ -255,6 +263,14 @@ class ChapTest(unittest.TestCase):
                             "192.168.100.201",
                             "192.168.100.202"
                         ],
+                        "auth": {
+                            "username": "",
+                            "password": "",
+                            "password_encryption_enabled": False,
+                            "mutual_username": "",
+                            "mutual_password": "",
+                            "mutual_password_encryption_enabled": False
+                        },
                         "inactive_portal_ips": [
                             "192.168.100.201"
                         ],
@@ -266,5 +282,5 @@ class ChapTest(unittest.TestCase):
             }
         },
         "updated": "2018/12/07 09:18:13",
-        "version": 10
+        "version": 11
     }

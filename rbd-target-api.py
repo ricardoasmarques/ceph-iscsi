@@ -722,6 +722,69 @@ def _gateway(target_iqn=None, gateway_name=None):
         return jsonify(message="Gateway defined/mapped"), 200
 
 
+@app.route('/api/gatewayauth/<target_iqn>', methods=['PUT'])
+@requires_restricted_auth
+def gatewayauth(target_iqn):
+    """
+    Configures local gateway authentication
+    The following parameters are needed to manage gateway auth
+    :param target_iqn: (str) target IQN name
+    :param username: (str) username string is 8-64 chars long containing any alphanumeric in
+                           [0-9a-zA-Z] and '.' ':' '@' '_' '-'
+    :param password: (str) password string is 12-16 chars long containing any alphanumeric in
+                           [0-9a-zA-Z] and '@' '-' '_' '/'
+    :param mutual_username: (str) mutual_username string is 8-64 chars long containing any
+                            alphanumeric in
+                            [0-9a-zA-Z] and '.' ':' '@' '_' '-'
+    :param mutual_password: (str) mutual_password string is 12-16 chars long containing any
+                            alphanumeric in
+                            [0-9a-zA-Z] and '@' '-' '_' '/'
+    **RESTRICTED**
+    Example:
+    curl --insecure --user admin:admin -d username=myiscsiusername -d password=myiscsipassword
+        -d mutual_username=myiscsiusername -d mutual_password=myiscsipassword
+        -X PUT https://192.168.122.69:5000/api/gatewayauth/iqn.2003-01.org.ceph.iscsi-gw:iscsi-igw
+    """
+
+    try:
+        target_iqn, iqn_type = normalize_wwn(['iqn'], target_iqn)
+    except RTSLibError as err:
+        err_str = "Invalid iqn {} - {}".format(target_iqn, err)
+        return jsonify(message=err_str), 500
+
+    gateway_name = this_host()
+
+    config.refresh()
+
+    username = request.form.get('username', '')
+    password = request.form.get('password', '')
+    mutual_username = request.form.get('mutual_username', '')
+    mutual_password = request.form.get('mutual_password', '')
+
+    error_msg = valid_credentials(username, password, mutual_username, mutual_password)
+    if not error_msg:
+        auth_enabled = (username and password)
+        target_config = config.config['targets'][target_iqn]
+        if auth_enabled and target_config['acl_enabled']:
+            error_msg = 'ACL authentication must be disabled'
+    if error_msg:
+        logger.error("BAD gateway auth request from {} - {}".format(
+            request.remote_addr, error_msg))
+        return jsonify(message=error_msg), 400
+
+    if request.method == 'PUT':
+        try:
+            target = GWTarget(logger, target_iqn, [])
+            target.set_auth_config(gateway_name, username, password,
+                                   mutual_username, mutual_password)
+        except CephiSCSIError as err:
+            err_msg = "Could not configure gateway authentication: {}".format(err)
+            logger.error(err_msg)
+            return jsonify(message=err_msg), 500
+
+        return jsonify(message="gateway auth configured successfully"), 200
+
+
 @app.route('/api/targetlun/<target_iqn>', methods=['PUT', 'DELETE'])
 @requires_restricted_auth
 def target_disk(target_iqn=None):
@@ -1579,6 +1642,16 @@ def targetauth(target_iqn=None):
     if action == 'disable_acl' and target_config['clients'].keys():
         return jsonify(message='Cannot disable ACL authentication '
                                'because target has clients'), 400
+
+    if action == 'enable_acl':
+        for portal_name, portal_config in target_config['portals'].items():
+            username = portal_config['auth']['username']
+            password = portal_config['auth']['password']
+            auth_enabled = (username and password)
+            if auth_enabled:
+                return jsonify(message="Cannot enable ACL authentication "
+                                       "because gateway CHAP authentication is "
+                                       "enabled for '{}'".format(portal_name)), 400
 
     try:
         gateways = get_remote_gateways(target_config['portals'], logger)

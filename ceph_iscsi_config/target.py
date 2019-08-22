@@ -9,11 +9,11 @@ import ceph_iscsi_config.settings as settings
 
 from ceph_iscsi_config.utils import (normalize_ip_address, normalize_ip_literal,
                                      ip_addresses, this_host, format_lio_yes_no,
-                                     CephiSCSIError, CephiSCSIInval)
+                                     encryption_available, CephiSCSIError, CephiSCSIInval)
 from ceph_iscsi_config.common import Config
 from ceph_iscsi_config.discovery import Discovery
 from ceph_iscsi_config.alua import alua_create_group, alua_format_group_name
-from ceph_iscsi_config.client import GWClient
+from ceph_iscsi_config.client import GWClient, CHAP
 from ceph_iscsi_config.gateway_object import GWObject
 from ceph_iscsi_config.backstore import lookup_storage_object_by_disk
 
@@ -252,16 +252,64 @@ class GWTarget(GWObject):
                 return portal_name
         return None
 
+    def _get_tpg_by_gateway_name(self, gateway_name):
+        tpg_tag = self.tpg_tag_by_gateway_name.get(gateway_name)
+        if tpg_tag:
+            for tpg_item in self.tpg_list:
+                if tpg_item.tag == tpg_tag:
+                    return tpg_item
+        return None
+
+    def set_auth_config(self, gateway_name=None, username=None, password=None,
+                        mutual_username=None, mutual_password=None):
+        self.load_config()
+        tpg = self._get_tpg_by_gateway_name(gateway_name)
+
+        self.set_auth_lio(tpg, username, password, mutual_username, mutual_password)
+
+        encryption_enabled = encryption_available()
+        auth_config = {
+            'username': '',
+            'password': '',
+            'password_encryption_enabled': encryption_enabled,
+            'mutual_username': '',
+            'mutual_password': '',
+            'mutual_password_encryption_enabled': encryption_enabled
+        }
+        if username != '':
+            chap = CHAP(username, password, encryption_enabled)
+            chap_mutual = CHAP(mutual_username, mutual_password, encryption_enabled)
+            auth_config['username'] = chap.user
+            auth_config['password'] = chap.encrypted_password(encryption_enabled)
+            auth_config['mutual_username'] = chap_mutual.user
+            auth_config['mutual_password'] = chap_mutual.encrypted_password(encryption_enabled)
+
+        target_config = self.config.config['targets'][self.iqn]
+        portal_config = target_config['portals'][gateway_name]
+        portal_config['auth'] = auth_config
+        self.config.update_item("targets", self.iqn, target_config)
+        self.config.commit("retain")
+        if self.config.error:
+            raise CephiSCSIError(self.config.error_msg)
+
+    def set_auth_lio(self, tpg=None, username=None, password=None, mutual_username=None,
+                     mutual_password=None):
+        tpg.chap_userid = username
+        tpg.chap_password = password
+        tpg.chap_mutual_userid = mutual_username
+        tpg.chap_mutual_password = mutual_password
+
+        auth_enabled = (username and password)
+        if auth_enabled:
+            tpg.set_attribute('authentication', '1')
+        else:
+            GWClient.try_disable_auth(tpg)
+
     def create_tpg(self, ip):
 
         try:
-            tpg = None
             gateway_name = self._get_gateway_name(ip)
-            tpg_tag = self.tpg_tag_by_gateway_name.get(gateway_name)
-            if tpg_tag:
-                for tpg_item in self.tpg_list:
-                    if tpg_item.tag == tpg_tag:
-                        tpg = tpg_item
+            tpg = self._get_tpg_by_gateway_name(gateway_name)
             if not tpg:
                 tpg = TPG(self.target)
 
@@ -271,6 +319,26 @@ class GWTarget(GWObject):
             self.logger.debug("(Gateway.create_tpg) Added tpg for portal "
                               "ip {}".format(ip))
             if ip in self.active_portal_ips:
+                target_config = self.config.config['targets'][self.iqn]
+                # When creating a new gateway, authentication is not configured yet
+                if gateway_name in target_config['portals']:
+                    auth_config = target_config['portals'][gateway_name]['auth']
+                    config_chap = CHAP(auth_config['username'],
+                                       auth_config['password'],
+                                       auth_config['password_encryption_enabled'])
+                    if config_chap.error:
+                        self.error = True
+                        self.error_msg = config_chap.error_msg
+                        return
+                    config_chap_mutual = CHAP(auth_config['mutual_username'],
+                                              auth_config['mutual_password'],
+                                              auth_config['mutual_password_encryption_enabled'])
+                    if config_chap_mutual.error:
+                        self.error = True
+                        self.error_msg = config_chap_mutual.error_msg
+                        return
+                    self.set_auth_lio(tpg, config_chap.user, config_chap.password,
+                                      config_chap_mutual.user, config_chap_mutual.password)
                 if self.enable_portal:
                     NetworkPortal(tpg, normalize_ip_literal(ip))
                 tpg.enable = True
@@ -616,6 +684,13 @@ class GWTarget(GWObject):
                     inactive_portal_ip.remove(active_portal_ip)
 
                 portal_metadata = {"tpgs": len(self.tpg_list),
+                                   "auth": {
+                                       'username': '',
+                                       'password': '',
+                                       'password_encryption_enabled': False,
+                                       'mutual_username': '',
+                                       'mutual_password': '',
+                                       'mutual_password_encryption_enabled': False},
                                    "gateway_ip_list": self.gateway_ip_list,
                                    "portal_ip_addresses": self.active_portal_ips,
                                    "inactive_portal_ips": inactive_portal_ip}

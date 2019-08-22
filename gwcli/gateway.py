@@ -11,6 +11,7 @@ from gwcli.utils import (response_message, GatewayAPIError,
 import ceph_iscsi_config.settings as settings
 from ceph_iscsi_config.utils import (normalize_ip_address, format_lio_yes_no, this_host)
 from ceph_iscsi_config.target import GWTarget
+from ceph_iscsi_config.client import CHAP
 
 from gwcli.ceph import CephGroup
 
@@ -781,6 +782,7 @@ class GatewayGroup(UIGroup):
 class Gateway(UINode):
 
     display_attributes = ["name",
+                          "auth",
                           "gateway_ip_list",
                           "portal_ip_addresses",
                           "inactive_portal_ips",
@@ -802,11 +804,103 @@ class Gateway(UINode):
         for k, v in gateway_config.items():
             self.__setattr__(k, v)
 
+        # decode the chap password if necessary
+        if 'username' in self.auth and 'password' in self.auth:
+            self.chap = CHAP(self.auth['username'],
+                             self.auth['password'],
+                             self.auth['password_encryption_enabled'])
+            self.auth['username'] = self.chap.user
+            self.auth['password'] = self.chap.password
+        else:
+            self.auth['username'] = ''
+            self.auth['password'] = ''
+
+        # decode the chap_mutual password if necessary
+        if 'mutual_username' in self.auth and 'mutual_password' in self.auth:
+            self.chap_mutual = CHAP(self.auth['mutual_username'],
+                                    self.auth['mutual_password'],
+                                    self.auth['mutual_password_encryption_enabled'])
+            self.auth['mutual_username'] = self.chap_mutual.user
+            self.auth['mutual_password'] = self.chap_mutual.password
+        else:
+            self.auth['mutual_username'] = ''
+            self.auth['mutual_password'] = ''
+
         self.state = "DOWN"
         self.service_state = {"iscsi": "DOWN",
                               "api": "DOWN"}
 
         self.refresh()
+
+    def ui_command_auth(self, username=None, password=None, mutual_username=None,
+                        mutual_password=None):
+        """
+        Gateway authentication can be set to use CHAP/CHAP_MUTUAL by supplying
+        username, password, mutual_username, mutual_password
+
+        e.g.
+        auth username=<user> password=<pass> mutual_username=<m_user> mutual_password=<m_pass>
+
+        username / mutual_username ... the username is 8-64 character string. Each character
+                                       may either be an alphanumeric or use one of the following
+                                       special characters .,:,-,@.
+                                       Consider using the hosts 'shortname' or the initiators IQN
+                                       value as the username
+
+        password / mutual_password ... the password must be between 12-16 chars in length
+                                       containing alphanumeric characters, plus the following
+                                       special characters @,_,-,/
+        """
+
+        self.logger.debug("CMD: ../gateways/<gateway> auth *")
+
+        if not username:
+            self.logger.error("To set authentication, specify "
+                              "username=<user> password=<password> "
+                              "[mutual_username]=<user> [mutual_password]=<password> "
+                              "or nochap")
+            return
+
+        if username == 'nochap':
+            username = ''
+            password = ''
+            mutual_username = ''
+            mutual_password = ''
+
+        self.logger.debug("auth to be set to username='{}', password='{}', mutual_username='{}', "
+                          "mutual_password='{}' for '{}'".format(username, password,
+                                                                 mutual_username, mutual_password,
+                                                                 self.name))
+        target_iqn = self.parent.parent.name
+
+        api_vars = {
+            "username": username,
+            "password": password,
+            "mutual_username": mutual_username,
+            "mutual_password": mutual_password
+        }
+
+        gatewayauth_api = ('{}://{}:{}/api/'
+                           'gatewayauth/{}'.format(self.http_mode,
+                                                   self.name,
+                                                   settings.config.api_port,
+                                                   target_iqn))
+        api = APIRequest(gatewayauth_api, data=api_vars)
+        api.put()
+
+        if api.response.status_code == 200:
+            self.logger.debug("- gateway credentials updated")
+            self.auth['username'] = username
+            self.auth['password'] = password
+            self.auth['mutual_username'] = mutual_username
+            self.auth['mutual_password'] = mutual_password
+            self.logger.info('ok')
+
+        else:
+            self.logger.error("Failed to update the gateway's auth: "
+                              "{}".format(response_message(api.response,
+                                                           self.logger)))
+            return
 
     def ui_command_refresh(self):
         """
@@ -864,5 +958,13 @@ class Gateway(UINode):
     def summary(self):
 
         state = self.state
-        return "{} ({})".format(','.join(self.portal_ip_addresses),
-                                state), (state == "UP")
+        msg = ["{} ({})".format(','.join(self.portal_ip_addresses), state)]
+
+        auth_text = "Auth: None"
+        if self.auth.get('mutual_username'):
+            auth_text = "Auth: CHAP_MUTUAL"
+        elif self.auth.get('username'):
+            auth_text = "Auth: CHAP"
+        msg.append(auth_text)
+
+        return ", ".join(msg), (state == "UP")

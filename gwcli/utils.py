@@ -259,6 +259,15 @@ def valid_client(**kwargs):
                     "has been defined "
                     "(>{} gateways)".format(settings.config.minimum_gateways))
 
+        # ACL authentication cannot be mixed with gateway CHAP authentication
+        for portal_name, portal_config in target_config['portals'].items():
+            username = portal_config['auth']['username']
+            password = portal_config['auth']['password']
+            auth_enabled = (username and password)
+            if auth_enabled:
+                return ("Cannot define client because gateway "
+                        "CHAP authentication is enabled for '{}'".format(portal_name))
+
         # at this point pre-req's look good
         return 'ok'
 
