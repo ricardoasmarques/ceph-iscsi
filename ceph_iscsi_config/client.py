@@ -307,7 +307,8 @@ class GWClient(GWObject):
 
             client.manage('present')  # ensure the client exists
 
-    def try_disable_auth(self, tpg):
+    @staticmethod
+    def try_disable_auth(tpg):
         """
         Disable authentication (enable ACL mode) if this is the last CHAP user.
 
@@ -318,6 +319,9 @@ class GWClient(GWObject):
         for client in tpg.node_acls:
             if client.chap_userid or client.chap_password:
                 return
+
+        if tpg.chap_userid or tpg.chap_password:
+            return
 
         tpg.set_attribute('authentication', '0')
 
@@ -371,7 +375,7 @@ class GWClient(GWObject):
             if auth_enabled:
                 self.tpg.set_attribute('authentication', '1')
             else:
-                self.try_disable_auth(self.tpg)
+                GWClient.try_disable_auth(self.tpg)
 
             self.logger.debug("Updating config object meta data")
             encryption_enabled = encryption_available()
@@ -397,7 +401,22 @@ class GWClient(GWObject):
         else:
             self.change_count += 1
 
+        GWClient.update_inherited_auth(self.tpg, target_config)
         self._update_acl(target_config)
+
+    @staticmethod
+    def update_inherited_auth(tpg, target_config):
+        """
+        Clients without explicit auth credentials should inherited them from the target
+        """
+        for acl in tpg.node_acls:
+            client_auth = target_config['clients'][acl.node_wwn]['auth']
+            client_auth_enabled = client_auth['username'] and client_auth['password']
+            if not client_auth_enabled:
+                acl.chap_userid = tpg.chap_userid
+                acl.chap_password = tpg.chap_password
+                acl.chap_mutual_userid = tpg.chap_mutual_userid
+                acl.chap_mutual_password = tpg.chap_mutual_password
 
     def _update_acl(self, target_config):
         if self.tpg.node_acls:
@@ -485,7 +504,7 @@ class GWClient(GWObject):
 
         try:
             self.acl.delete()
-            self.try_disable_auth(self.tpg)
+            GWClient.try_disable_auth(self.tpg)
             self.change_count += 1
             self.logger.info("(Client.delete) deleted NodeACL for "
                              "{}".format(self.iqn))
