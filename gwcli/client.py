@@ -347,15 +347,8 @@ class Client(UINode):
 
         msg = ['LOGGED-IN'] if self.logged_in else []
 
-        target_auth = self.parent.parent.auth
-        target_auth_enabled = target_auth['username'] and target_auth['password']
-
         auth_text = "Auth: None"
         status = False
-
-        if target_auth_enabled:
-            auth_text = "Auth: Inherited"
-            status = True
 
         if self.auth.get('mutual_username'):
             auth_text = "Auth: CHAP_MUTUAL"

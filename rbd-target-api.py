@@ -1599,10 +1599,25 @@ def targetauth(target_iqn=None):
         return jsonify(message='Cannot disable ACL authentication '
                                'because target has clients'), 400
 
+    # Mixing TPG/target auth with ACL is not supported
+    if action == 'enable_acl':
+        target_username = target_config['auth']['username']
+        target_password = target_config['auth']['password']
+        target_auth_enabled = (target_username and target_password)
+        if target_auth_enabled:
+            return jsonify(message="Cannot enable ACL authentication "
+                                   "because target CHAP authentication is enabled"), 400
+
     username = request.form.get('username', '')
     password = request.form.get('password', '')
     mutual_username = request.form.get('mutual_username', '')
     mutual_password = request.form.get('mutual_password', '')
+
+    # Mixing TPG/target auth with ACL is not supported
+    auth_enabled = (username and password)
+    if auth_enabled and target_config['acl_enabled']:
+        return jsonify(message="Cannot enable target CHAP authentication "
+                               "because ACL authentication is enabled"), 400
 
     error_msg = valid_credentials(username, password, mutual_username, mutual_password)
     if error_msg:
@@ -1662,7 +1677,7 @@ def _targetauth(target_iqn=None):
             target.update_acl(acl_enabled)
         else:
             tpg = target.get_tpg_by_gateway_name(local_gw)
-            target.update_auth(tpg, target_config, username, password,
+            target.update_auth(tpg, username, password,
                                mutual_username, mutual_password)
 
     if committing_host == local_gw:

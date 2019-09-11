@@ -260,14 +260,12 @@ class GWTarget(GWObject):
                     return tpg_item
         return None
 
-    def update_auth(self, tpg, target_config, username=None, password=None,
+    def update_auth(self, tpg, username=None, password=None,
                     mutual_username=None, mutual_password=None):
         tpg.chap_userid = username
         tpg.chap_password = password
         tpg.chap_mutual_userid = mutual_username
         tpg.chap_mutual_password = mutual_password
-
-        GWClient.update_inherited_auth(tpg, target_config)
 
         auth_enabled = (username and password)
         if auth_enabled:
@@ -305,7 +303,7 @@ class GWTarget(GWObject):
                     self.error = True
                     self.error_msg = config_chap_mutual.error_msg
                     return
-                self.update_auth(tpg, target_config, config_chap.user, config_chap.password,
+                self.update_auth(tpg, config_chap.user, config_chap.password,
                                  config_chap_mutual.user, config_chap_mutual.password)
                 if self.enable_portal:
                     NetworkPortal(tpg, normalize_ip_literal(ip))

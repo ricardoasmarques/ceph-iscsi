@@ -401,22 +401,7 @@ class GWClient(GWObject):
         else:
             self.change_count += 1
 
-        GWClient.update_inherited_auth(self.tpg, target_config)
         self._update_acl(target_config)
-
-    @staticmethod
-    def update_inherited_auth(tpg, target_config):
-        """
-        Clients without explicit auth credentials should inherited them from the target
-        """
-        for acl in tpg.node_acls:
-            client_auth = target_config['clients'][acl.node_wwn]['auth']
-            client_auth_enabled = client_auth['username'] and client_auth['password']
-            if not client_auth_enabled:
-                acl.chap_userid = tpg.chap_userid
-                acl.chap_password = tpg.chap_password
-                acl.chap_mutual_userid = tpg.chap_mutual_userid
-                acl.chap_mutual_password = tpg.chap_mutual_password
 
     def _update_acl(self, target_config):
         if self.tpg.node_acls:
