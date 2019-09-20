@@ -10,8 +10,8 @@ from rtslib_fb.utils import normalize_wwn, RTSLibError
 
 from ceph_iscsi_config.client import GWClient
 import ceph_iscsi_config.settings as settings
-from ceph_iscsi_config.utils import (resolve_ip_addresses,
-                                     CephiSCSIError, this_host)
+from ceph_iscsi_config.utils import (resolve_ip_addresses, CephiSCSIError,
+                                     this_host)
 
 __author__ = 'Paul Cuzner'
 
@@ -196,14 +196,38 @@ def valid_credentials(username, password, mutual_username, mutual_password):
     if not mutual_username and mutual_password:
         return 'Mutual username is required'
 
+    if username and len(username) < 8:
+        return 'Minimum length of username is 8 characters'
+
+    if username and len(username) > 64:
+        return 'Maximum length of username is 64 characters'
+
     if username and not usr_regex.search(username):
         return 'Invalid username'
+
+    if mutual_username and len(mutual_username) < 8:
+        return 'Minimum length of mutual username is 8 characters'
+
+    if mutual_username and len(mutual_username) > 64:
+        return 'Maximum length of mutual username is 64 characters'
 
     if mutual_username and not usr_regex.search(mutual_username):
         return 'Invalid mutual username'
 
+    if password and len(password) < 12:
+        return 'Minimum length of password is 12 characters'
+
+    if password and len(password) > 16:
+        return 'Maximum length of password is 16 characters'
+
     if password and not pw_regex.search(password):
         return 'Invalid password'
+
+    if mutual_password and len(mutual_password) < 12:
+        return 'Minimum length of mutual password is 12 characters'
+
+    if mutual_password and len(mutual_password) > 16:
+        return 'Maximum length of mutual password is 16 characters'
 
     if mutual_password and not pw_regex.search(mutual_password):
         return 'Invalid mutual password'
@@ -352,6 +376,21 @@ def valid_snapshot_name(name):
     if not regex.search(name):
         return False
     return True
+
+
+def refresh_control_values(control_values, controls, def_settings):
+    for key, setting in def_settings.items():
+        val = controls.get(setting.name)
+        if val is not None:
+            # config values may be normalized or raw
+            val = setting.to_str(setting.normalize(val))
+
+        def_val = setting.to_str(getattr(settings.config, key))
+
+        if val is None or val == def_val:
+            control_values[setting.name] = def_val
+        else:
+            control_values[setting.name] = "{} (override)".format(val)
 
 
 class GatewayError(Exception):

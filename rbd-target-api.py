@@ -24,6 +24,7 @@ from flask import Flask, jsonify, request
 from rtslib_fb.utils import RTSLibError, normalize_wwn
 
 import ceph_iscsi_config.settings as settings
+from ceph_iscsi_config.gateway_setting import IntSetting
 from ceph_iscsi_config.gateway import CephiSCSIGateway
 from ceph_iscsi_config.discovery import Discovery
 from ceph_iscsi_config.target import GWTarget
@@ -33,7 +34,7 @@ from ceph_iscsi_config.client import GWClient, CHAP
 from ceph_iscsi_config.common import Config
 from ceph_iscsi_config.utils import (normalize_ip_literal, resolve_ip_addresses,
                                      ip_addresses, read_os_release,
-                                     format_lio_yes_no, CephiSCSIError, this_host)
+                                     CephiSCSIError, this_host)
 
 from gwcli.utils import (APIRequest, valid_gateway, valid_client,
                          valid_credentials, get_remote_gateways, valid_snapshot_name,
@@ -210,7 +211,7 @@ def parse_target_controls(request):
 
     controls = _parse_controls(request.form['controls'], GWTarget.SETTINGS)
     for k, v in controls.items():
-        if k in GWClient.SETTINGS:
+        if GWClient.SETTINGS.get(k):
             client_controls[k] = v
         else:
             tpg_controls[k] = v
@@ -1642,7 +1643,7 @@ def targetinfo(target_iqn):
         http://192.168.122.69:5000/api/targetinfo/iqn.2003-01.com.redhat.iscsi-gw:iscsi-igw
     """
     if target_iqn not in config.config['targets']:
-        return jsonify(message="Target {} does not exist".format(target_iqn)), 400
+        return jsonify(message="Target {} does not exist".format(target_iqn)), 404
     target_config = config.config['targets'][target_iqn]
     gateways = target_config['portals']
     num_sessions = 0
@@ -1672,7 +1673,7 @@ def _targetinfo(target_iqn):
         http://192.168.122.69:5000/api/_targetinfo/iqn.2003-01.com.redhat.iscsi-gw:iscsi-igw
     """
     if target_iqn not in config.config['targets']:
-        return jsonify(message="Target {} does not exist".format(target_iqn)), 400
+        return jsonify(message="Target {} does not exist".format(target_iqn)), 404
     num_sessions = GWTarget.get_num_sessions(target_iqn)
     return jsonify({
         "num_sessions": num_sessions
@@ -1691,7 +1692,7 @@ def gatewayinfo():
     """
     local_gw = this_host()
     if local_gw not in config.config['gateways']:
-        return jsonify(message="Gateway {} does not exist in configuration".format(local_gw)), 400
+        return jsonify(message="Gateway {} does not exist in configuration".format(local_gw)), 404
     num_sessions = 0
     for target_iqn, target in config.config['targets'].items():
         if local_gw in target['portals']:
@@ -2154,10 +2155,10 @@ def clientinfo(target_iqn, client_iqn):
         iqn.2003-01.com.redhat.iscsi-gw:iscsi-igw/iqn.2003-01.com.redhat.iscsi-gw:iscsi-igw-client
     """
     if target_iqn not in config.config['targets']:
-        return jsonify(message="Target {} does not exist".format(target_iqn)), 400
+        return jsonify(message="Target {} does not exist".format(target_iqn)), 404
     target_config = config.config['targets'][target_iqn]
     if client_iqn not in target_config['clients']:
-        return jsonify(message="Client {} does not exist".format(client_iqn)), 400
+        return jsonify(message="Client {} does not exist".format(client_iqn)), 404
     gateways = target_config['portals']
     response = {
         "alias": '',
@@ -2197,10 +2198,10 @@ def _clientinfo(target_iqn, client_iqn):
         iqn.2003-01.com.redhat.iscsi-gw:iscsi-igw/iqn.2003-01.com.redhat.iscsi-gw:iscsi-igw-client
     """
     if target_iqn not in config.config['targets']:
-        return jsonify(message="Target {} does not exist".format(target_iqn)), 400
+        return jsonify(message="Target {} does not exist".format(target_iqn)), 404
     target_config = config.config['targets'][target_iqn]
     if client_iqn not in target_config['clients']:
-        return jsonify(message="Client {} does not exist".format(client_iqn)), 400
+        return jsonify(message="Client {} does not exist".format(client_iqn)), 404
 
     logged_in = GWClient.get_client_info(target_iqn, client_iqn)
     return jsonify(logged_in), 200
@@ -2352,6 +2353,23 @@ def hostgroup(target_iqn, group_name):
                                                          api.response.json()['message'])), 400
 
 
+def fill_settings_dict(def_settings):
+    defaults = {}
+    limits = {}
+
+    for k, setting in def_settings.items():
+        # Return normalized value to match get_config()'s format
+        defaults[k] = getattr(settings.config, k)
+
+        if isinstance(setting, IntSetting):
+            limits[k] = {'min': setting.min_val, 'max': setting.max_val,
+                         'type': setting.type_str}
+        else:
+            limits[k] = {'type': setting.type_str}
+
+    return defaults, limits
+
+
 @app.route('/api/settings', methods=['GET'])
 @requires_restricted_auth
 def get_settings():
@@ -2362,31 +2380,17 @@ def get_settings():
     curl --insecure --user admin:admin -X GET https://192.168.122.69:5000/api/settings
     """
 
-    target_default_controls = {}
-    target_controls_limits = {}
-    settings_list = GWTarget.SETTINGS
-    for k in settings_list:
-        default_val = getattr(settings.config, k, None)
-        if k in settings.Settings.LIO_YES_NO_SETTINGS:
-            default_val = format_lio_yes_no(default_val)
-        elif k in settings.Settings.LIO_INT_SETTINGS_LIMITS:
-            target_controls_limits[k] = settings.Settings.LIO_INT_SETTINGS_LIMITS[k]
-        target_default_controls[k] = default_val
+    target_default_controls, target_controls_limits = fill_settings_dict(GWTarget.SETTINGS)
 
     disk_default_controls = {}
     disk_controls_limits = {}
     required_rbd_features = {}
     unsupported_rbd_features = {}
-    for backstore, ks in LUN.SETTINGS.items():
-        disk_default_controls[backstore] = {}
-        disk_controls_limits[backstore] = {}
-        for k in ks:
-            default_val = getattr(settings.config, k, None)
-            disk_default_controls[backstore][k] = default_val
-            if k in settings.Settings.LIO_INT_SETTINGS_LIMITS:
-                disk_controls_limits[backstore][k] = settings.Settings.LIO_INT_SETTINGS_LIMITS[k]
-        required_rbd_features[backstore] = RBDDev.required_features(backstore)
-        unsupported_rbd_features[backstore] = RBDDev.unsupported_features(backstore)
+    for bs, bs_settings in LUN.SETTINGS.items():
+        disk_default_controls[bs], disk_controls_limits[bs] = fill_settings_dict(bs_settings)
+
+        required_rbd_features[bs] = RBDDev.required_features(bs)
+        unsupported_rbd_features[bs] = RBDDev.unsupported_features(bs)
 
     return jsonify({
         'target_default_controls': target_default_controls,

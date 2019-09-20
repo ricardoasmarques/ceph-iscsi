@@ -12,6 +12,7 @@ from rtslib_fb.utils import RTSLibError
 
 import ceph_iscsi_config.settings as settings
 
+from ceph_iscsi_config.gateway_setting import TCMU_SETTINGS, KERNEL_SETTINGS
 from ceph_iscsi_config.backstore import USER_RBD, RBD
 from ceph_iscsi_config.utils import (convert_2_bytes, gen_control_string,
                                      valid_size, get_pool_id, ip_addresses,
@@ -301,41 +302,8 @@ class LUN(GWObject):
     DEFAULT_BACKSTORE = RBD
 
     SETTINGS = {
-        USER_RBD: [
-            "max_data_area_mb",
-            "qfull_timeout",
-            "osd_op_timeout",
-            "hw_max_sectors"
-        ],
-        RBD: [
-            "block_size",
-            "emulate_3pc",
-            "emulate_caw",
-            "emulate_dpo",
-            "emulate_fua_read",
-            "emulate_fua_write",
-            "emulate_model_alias",
-            "emulate_pr",
-            "emulate_rest_reord",
-            "emulate_tas",
-            "emulate_tpu",
-            "emulate_tpws",
-            "emulate_ua_intlck_ctrl",
-            "emulate_write_cache",
-            "enforce_pr_isids",
-            "force_pr_aptpl",
-            "is_nonrot",
-            "max_unmap_block_desc_count",
-            "max_unmap_lba_count",
-            "max_write_same_len",
-            "optimal_sectors",
-            "pi_prot_type",
-            "pi_prot_verify",
-            "queue_depth",
-            "unmap_granularity",
-            "unmap_granularity_alignment",
-            "unmap_zeroes_data"
-        ]
+        USER_RBD: TCMU_SETTINGS,
+        RBD: KERNEL_SETTINGS
     }
 
     def __init__(self, logger, pool, image, size, allocating_host,
