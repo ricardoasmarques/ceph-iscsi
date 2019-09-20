@@ -24,7 +24,7 @@ from flask import Flask, jsonify, request
 from rtslib_fb.utils import RTSLibError, normalize_wwn
 
 import ceph_iscsi_config.settings as settings
-from ceph_iscsi_config.gateway_setting import IntSetting
+from ceph_iscsi_config.gateway_setting import IntSetting, EnumSetting
 from ceph_iscsi_config.gateway import CephiSCSIGateway
 from ceph_iscsi_config.discovery import Discovery
 from ceph_iscsi_config.target import GWTarget
@@ -2363,6 +2363,9 @@ def fill_settings_dict(def_settings):
 
         if isinstance(setting, IntSetting):
             limits[k] = {'min': setting.min_val, 'max': setting.max_val,
+                         'type': setting.type_str}
+        elif isinstance(setting, EnumSetting):
+            limits[k] = {'values': setting.valid_vals,
                          'type': setting.type_str}
         else:
             limits[k] = {'type': setting.type_str}

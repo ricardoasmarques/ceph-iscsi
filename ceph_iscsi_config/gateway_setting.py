@@ -149,6 +149,10 @@ TGT_SETTINGS = {
     "max_xmit_data_segment_length": IntSetting("max_xmit_data_segment_length",
                                                512, 16777215, 262144)}
 
+TGT_KERNEL_SETTINGS = {
+    # WIP - just for testing purpose
+    "default_cmdsn_depth": IntSetting("default_cmdsn_depth", 2, 60, 20)}
+
 SYS_SETTINGS = {
     "cluster_name": StrSetting("cluster_name", "ceph"),
     "pool": StrSetting("pool", "rbd"),
@@ -186,7 +190,11 @@ TCMU_SETTINGS = {
     "hw_max_sectors": IntSetting("hw_max_sectors", 1, 8192, 1024)}
 
 KERNEL_SETTINGS = {
-    "block_size": IntSetting("max_data_area_mb", 512),
+    # WIP - just for testing purpose
+    "block_size": EnumSetting("block_size", 512, [512, 1024, 2048, 4096]),
+    "emulate_model_alias": StrSetting("emulate_model_alias", "0"),
+    "test": ListSetting("test", "def"),
+    "unmap_zeroes_data": IntSetting("unmap_zeroes_data", 0, 4294967295, 8192),
 }
 
 # "block_size": 512,
