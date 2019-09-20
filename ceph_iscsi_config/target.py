@@ -8,13 +8,13 @@ from rtslib_fb.alua import ALUATargetPortGroup
 
 import ceph_iscsi_config.settings as settings
 
+from ceph_iscsi_config.gateway_setting import TGT_SETTINGS, TGT_KERNEL_SETTINGS
 from ceph_iscsi_config.utils import (normalize_ip_address, normalize_ip_literal,
                                      ip_addresses, this_host, format_lio_yes_no,
                                      CephiSCSIError, CephiSCSIInval)
 from ceph_iscsi_config.common import Config
 from ceph_iscsi_config.discovery import Discovery
 from ceph_iscsi_config.alua import alua_create_group, alua_format_group_name
-from ceph_iscsi_config.client import GWClient
 from ceph_iscsi_config.gateway_object import GWObject
 from ceph_iscsi_config.backstore import lookup_storage_object_by_disk
 
@@ -25,16 +25,6 @@ class GWTarget(GWObject):
     """
     Class representing the state of the local LIO environment
     """
-    # iscsi tpg specific settings.
-    TPG_SETTINGS = [
-        "dataout_timeout",
-        "immediate_data",
-        "initial_r2t",
-        "max_outstanding_r2t",
-        "first_burst_length",
-        "max_burst_length",
-        "max_recv_data_segment_length",
-        "max_xmit_data_segment_length"]
 
     TPG_KERNEL_SETTINGS = [
         "default_cmdsn_depth",
@@ -46,7 +36,7 @@ class GWTarget(GWObject):
 
     # Settings for all transport/fabric objects. Using this allows apps like
     # gwcli to get/set all tpgs/clients under the target instead of per obj.
-    SETTINGS = TPG_SETTINGS + TPG_KERNEL_SETTINGS + GWClient.SETTINGS
+    SETTINGS = dict(list(TGT_SETTINGS.items()) + list(TGT_KERNEL_SETTINGS.items()))
 
     def __init__(self, logger, iqn, gateway_ip_list, enable_portal=True):
         """
@@ -188,7 +178,7 @@ class GWTarget(GWObject):
                                                 'iscsi',
                                                 '{}/tpgt_*/attrib'.format(self.iqn)))
             for base in paths:
-                for attr in GWTarget.TPG_KERNEL_SETTINGS:
+                for attr in TGT_KERNEL_SETTINGS:
                     path = base + "/" + attr
                     self.logger.debug("TPG attribute path {}".format(path))
                     if not os.path.isfile(path):
