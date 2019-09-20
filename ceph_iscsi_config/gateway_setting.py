@@ -207,7 +207,7 @@ TCMU_SETTINGS = {
 
 KERNEL_SETTINGS = {
     # WIP - just for testing purpose
-    "block_size": EnumSetting("block_size", 512, [512, 1024, 2048, 4096]),
+    "block_size": EnumSetting("block_size", [512, 1024, 2048, 4096], 512),
     "emulate_model_alias": StrSetting("emulate_model_alias", "0"),
     "test": ListSetting("test", "def"),
     "unmap_zeroes_data": IntSetting("unmap_zeroes_data", 0, 4294967295, 8192)}
